@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="fileApp">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Encryption/Decryption</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        input[type="file"], input[type="password"], input[type="number"], select, button {
+            margin-bottom: 10px;
+            padding: 8px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4caf50;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body ng-controller="FileController">
+    <h1>File Encryption/Decryption</h1>
+    <input type="file" id="fileInput" ng-model="fileInput">
+    <input type="password" id="passwordInput" placeholder="Enter password" ng-model="passwordInput">
+    <input type="number" id="userNumberInput" placeholder="Enter user number" ng-model="userNumberInput">
+    <select id="modeSelect" ng-model="modeSelect">
+        <option value="1">Encrypt</option>
+        <option value="2">Decrypt</option>
+    </select>
+    <button ng-click="processFile()">Process File</button>
+    <div id="errorMessage" class="error">{{ errorMessage }}</div>
+
+    <script>
+        angular.module('fileApp', [])
+            .controller('FileController', ['$scope', '$http', function($scope, $http) {
+                $scope.processFile = function() {
+                    const file = document.getElementById('fileInput').files[0];
+                    const password = $scope.passwordInput;
+                    const userNumber = $scope.userNumberInput;
+                    const mode = parseInt($scope.modeSelect);
+                    const errorMessage = document.getElementById('errorMessage');
+                    errorMessage.textContent = '';
+
+                    if (!file) {
+                        $scope.errorMessage = 'No file selected!';
+                        return;
+                    }
+                    if (!password) {
+                        $scope.errorMessage = 'Password cannot be empty!';
+                        return;
+                    }
+                    if (!userNumber) {
+                        $scope.errorMessage = 'User number cannot be empty!';
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        const fileContents = event.target.result;
+                        let processedContents;
+                        try {
+                            if (mode === 1) {
+                                processedContents = encryptContent(fileContents, password);
+                            } else if (mode === 2) {
+                                processedContents = decryptContent(fileContents, password);
+                                if (processedContents === null) {
+                                    $scope.errorMessage = 'Invalid password!';
+                                    $scope.$apply(); // Ensure AngularJS updates the view
+                                    return;
+                                }
+                            } else {
+                                console.error('Invalid mode!');
+                                return;
+                            }
+
+                            const blob = new Blob([processedContents], { type: 'text/plain' });
+                            const url = URL.createObjectURL(blob);
+                            const anchor = document.createElement('a');
+                            anchor.href = url;
+                            anchor.download = file.name;
+                            anchor.click();
+                            URL.revokeObjectURL(url);
+                            alert('File processed successfully!');
+                        } catch (error) {
+                            console.error('Error processing file:', error);
+                        }
+                    };
+                    reader.readAsText(file);
+
+                    // Save user credentials to database
+                    $http.post('/saveCredentials', { userNumber: userNumber, password: password })
+                        .then(function(response) {
+                            console.log('Credentials saved successfully:', response.data);
+                        })
+                        .catch(function(error) {
+                            console.error('Error saving credentials:', error);
+                        });
+                };
+
+                function encryptContent(content, password) {
+                    // Your encryption logic here
+                    // Example: Simple XOR encryption
+                    let encrypted = '';
+                    for (let i = 0; i < content.length; i++) {
+                        encrypted += String.fromCharCode(content.charCodeAt(i) ^ password.charCodeAt(i % password.length));
+                    }
+                    return encrypted;
+                }
+
+                function decryptContent(encryptedContent, password) {
+                    // Your decryption logic here
+                    // Example: Simple XOR decryption
+                    let decrypted = '';
+                    for (let i = 0; i < encryptedContent.length; i++) {
+                        decrypted += String.fromCharCode(encryptedContent.charCodeAt(i) ^ password.charCodeAt(i % password.length));
+                    }
+                    return decrypted;
+                }
+            }]);
+    </script>
+</body>
+</html>
